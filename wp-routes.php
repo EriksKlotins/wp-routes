@@ -43,6 +43,14 @@ class Route
 		Route::registerRoute('GET',$pattern, $handler, $title, $name);
 	}
 
+	/**
+	 * creates a route to GET or POST request
+	 * @param  [type] $pattern patter
+	 * @param  [type] $handler [description]
+	 * @param  [type] $name    [description]
+	 * @param  [type] $title   [description]
+	 * @return [type]          [description]
+	 */
 	public static function any( $pattern, $handler,  $name = null,  $title = null)
 	{
 		Route::registerRoute('ANY',$pattern, $handler, $title, $name);
