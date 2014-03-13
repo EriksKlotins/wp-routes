@@ -11,15 +11,37 @@ License: GPLv2 or later
 */
 
 
-
 class Route
 {
 
 	public static $mapping = array();
 	public static $current = array();
-
+	/**
+	 * Registers route
+	 * @param  string $method     whate type or request route handles (GET, POST, ANY)
+	 * @param  string $pattern    pattern for URL to route
+	 * @param  string $controller handler of this route, controller or function. '<controller_name>@<method_name>' defines call action - default 'index'
+	 * @param  [type] $title      [description]
+	 * @param  [type] $name       [description]
+	 * @return [type]             [description]
+	 */
 	private static function registerRoute($method, $pattern, $controller, $title = null, $name = null)
 	{
+		$action = null;
+		if (is_string($controller))
+		{
+			$parts = explode('@', $controller);
+			if(count($parts) == 2)
+			{
+				$controller = $parts[0];
+				$action = $parts[1];
+			}
+			else
+			{
+				$action = 'index';
+			}
+		}
+
 		$regex = preg_replace('/{([a-z]+)}/', '([a-zA-Z_0-9-]+)', $pattern);
 		$regex = str_replace('/', '\/', $regex);
 		$regex = '/'.$regex.'/';
@@ -27,7 +49,8 @@ class Route
 				'method'	=> $method, 
 				'regex'		=> $regex,
 				'pattern'	=> $pattern, 
-				'controller'=> $controller, 
+				'controller'=> $controller,
+				'action'	=> $action,
 				'title' 	=> $title, 
 				'name'		=> $name);
 	}
@@ -40,8 +63,10 @@ class Route
 
 	public static function post( $pattern,  $handler,  $name = null,  $title = null)
 	{
-		Route::registerRoute('GET',$pattern, $handler, $title, $name);
+		Route::registerRoute('POST',$pattern, $handler, $title, $name);
 	}
+
+
 
 	/**
 	 * creates a route to GET or POST request
@@ -56,10 +81,11 @@ class Route
 		Route::registerRoute('ANY',$pattern, $handler, $title, $name);
 	}
 
-	public static function to(string $name)
+	public static function to( $name, $params =array())
 	{
 		foreach (Route::$mapping as $route) 
 		{
+
 			if ($route['name'] == $name)
 			{
 				$url = $route['pattern'];
@@ -68,38 +94,53 @@ class Route
 				{
 					$url = str_replace($matches[0][$i], $params[$matches[1][$i] ], $url);
 				}
-				return get_bloginfo('home'). $url;
+				//var_dump($_SERVER['HTTP_HOST'], $url);
+				return $url;
 			}
 		}
 		return null;
 	}
 
-	public static function isCurrent(string $name)
+	public static function redirectTo($name, $params = array())
+	{
+		header('location: '. Route::to($name, $params));
+		die();
+	}
+
+	public static function isCurrent( $name)
 	{
 		return Route::$current['name'] == $name;
 	}
 
-	private static function run($handler, $params)
+	private static function run($handler, $params, $action)
 	{
 		if ($handler instanceof Closure)
 		{
 			$handler($params);
-		}elseif (is_string($handler))
+			die();
+		}
+		elseif (is_string($handler))
 		{
 			$controller = new $handler();
-			$controller->index($params);
+			$controller->$action($params);
+			die();
 		}
 	}
 
 	static function execute()
 	{
-		
+		$WP_SITEURL = preg_match('/http/',WP_SITEURL)? WP_SITEURL : '';
+		//var_dump('siteurl '.$WP_SITEURL, $_SERVER);
+	
 		foreach(Route::$mapping as $route)
 	 	{
 	 		if ($route['method'] == 'ANY' || $route['method'] == $_SERVER['REQUEST_METHOD'])
 	 		{
-	 			if (preg_match($route['regex'], $_SERVER['REQUEST_URI'], $result))
+	 			//var_dump($route['regex'], $_SERVER['REQUEST_SCHEME'].'://'. $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']);
+	 			//continue;
+	 			if (preg_match($route['regex'], $_SERVER['REQUEST_SCHEME'].'://'. $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'], $result))
 		 		{
+		 			//var_dump($result);
 			 		preg_match_all('/{([a-z]+)}/',$route['pattern'], $matches);
 					Route::$current = $route;	
 					$params = array();
@@ -108,8 +149,8 @@ class Route
 						$params[$matches[1][$i]] = $result[$i+1];
 					}
 				//	var_dump($result,$matches,$params);
-					Route::run($route['controller'], $params);//->index($params);
-					
+					Route::run($route['controller'], $params, $route['action']);//->index($params);
+					//var_dump($route);
 					$found = true;
 					break;
 		 		}
