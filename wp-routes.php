@@ -114,31 +114,31 @@ class Route
 
 	private static function run($handler, $params, $action)
 	{
+		
 		if ($handler instanceof Closure)
 		{
 			$handler($params);
-			die();
 		}
 		elseif (is_string($handler))
 		{
 			$controller = new $handler();
 			$controller->$action($params);
-			die();
 		}
+		die();
 	}
 
 	static function execute()
 	{
 		$WP_SITEURL = preg_match('/http/',WP_SITEURL)? WP_SITEURL : '';
 		//var_dump('siteurl '.$WP_SITEURL, $_SERVER);
-	
+		$found = false;
 		foreach(Route::$mapping as $route)
 	 	{
 	 		if ($route['method'] == 'ANY' || $route['method'] == $_SERVER['REQUEST_METHOD'])
 	 		{
-	 			//var_dump($route['regex'], $_SERVER['REQUEST_SCHEME'].'://'. $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']);
+	 			//var_dump($route['regex'],'://'. $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']);
 	 			//continue;
-	 			if (preg_match($route['regex'], $_SERVER['REQUEST_SCHEME'].'://'. $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'], $result))
+	 			if (preg_match($route['regex'], 'http://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'], $result))
 		 		{
 		 			//var_dump($result);
 			 		preg_match_all('/{([a-z]+)}/',$route['pattern'], $matches);
@@ -181,6 +181,23 @@ class Route
 		return $result;
 	}
 
-
-
+	static function load()
+	{
+		if (is_admin()) return; // admin sadalā šo nevajag
+		global $wp_query;
+		$wp_query = new \WP_Query('author__not_in=999999');
+		
+		$path = get_stylesheet_directory().'/routes.php';
+		if (file_exists($path))
+		{
+			require_once $path;
+		}
+		else
+		{
+			throw new Exception('routes.php must be present at (child) theme directory');
+		}
+	}
 }
+
+Route::load();
+
